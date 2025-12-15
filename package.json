@@ -1,6 +1,6 @@
 {
   "name": "valdex",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Runtime type validation with TypeScript type inference",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
