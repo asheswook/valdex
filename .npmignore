@@ -1,0 +1,10 @@
+src/
+test.ts
+original_validator.ts
+tsconfig.json
+tsup.config.ts
+.git/
+.idea/
+.github/
+*.log
+node_modules/
