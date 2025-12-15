@@ -120,6 +120,7 @@ validate(data, {
 | `Boolean`   | `boolean`       |
 | `Array`     | `any[]`         |
 | `Object`    | `object`        |
+| `Date`      | `Date`          |
 
 ## Error Handling
 

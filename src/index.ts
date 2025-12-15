@@ -7,7 +7,7 @@ type Expression = {
     [key: string | number]: PrimitiveType | (PrimitiveType & OptionalMarker) | (PrimitiveType & NullableMarker) | (PrimitiveType & OptionalMarker & NullableMarker) | Expression | (Expression & OptionalMarker) | (Expression & NullableMarker) | (Expression & OptionalMarker & NullableMarker) | ArraySchema | (ArraySchema & OptionalMarker) | (ArraySchema & NullableMarker) | (ArraySchema & OptionalMarker & NullableMarker)
 }
 
-type PrimitiveType = NumberConstructor | StringConstructor | BooleanConstructor | ArrayConstructor | ObjectConstructor;
+type PrimitiveType = NumberConstructor | StringConstructor | BooleanConstructor | ArrayConstructor | ObjectConstructor | DateConstructor;
 
 type InferPrimitiveType<T> =
     T extends NumberConstructor ? number :
@@ -15,7 +15,8 @@ type InferPrimitiveType<T> =
             T extends BooleanConstructor ? boolean :
                 T extends ArrayConstructor ? any[] :
                     T extends ObjectConstructor ? object :
-                        never;
+                        T extends DateConstructor ? Date :
+                            never;
 
 type InferType<T> =
     T extends PrimitiveType & OptionalMarker & NullableMarker
@@ -125,7 +126,8 @@ const TYPE_VALIDATORS: Record<string, (value: any) => boolean> = {
     String: (value) => typeof value === 'string',
     Boolean: (value) => typeof value === 'boolean',
     Array: (value) => Array.isArray(value),
-    Object: (value) => typeof value === 'object' && value !== null && !Array.isArray(value)
+    Object: (value) => typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date),
+    Date: (value) => value instanceof Date && !Number.isNaN(value.getTime())
 };
 
 function isValidateExpression(ctor: any): ctor is Expression {
