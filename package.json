@@ -23,7 +23,7 @@
   "scripts": {
     "build": "tsup",
     "prepublishOnly": "npm run build",
-    "test": "tsx test.ts"
+    "test": "jest"
   },
   "keywords": [
     "typescript",
@@ -36,9 +36,12 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "tsup": "^8.3.5",
-    "typescript": "^5.7.2",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   },
   "repository": {
     "type": "git",

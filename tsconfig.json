@@ -11,7 +11,16 @@
     "declaration": true,
     "declarationMap": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "incremental": true,
+//    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
+    "strictBindCallApply": false,
+//    "forceConsistentCasingInFileNames": false,
+    "noFallthroughCasesInSwitch": false,
+    "stripInternal": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test.ts"]
