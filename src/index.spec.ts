@@ -1129,6 +1129,601 @@ describe('validate', () => {
         });
     });
 
+    describe('deeply nested structures', () => {
+        describe('nested arrays (array of arrays)', () => {
+            it('should validate 2-level nested array (array of string arrays)', () => {
+                const data = {
+                    matrix: [['a', 'b'], ['c', 'd'], ['e', 'f']]
+                };
+                expect(() => validate(data, {
+                    matrix: [[String]] as any
+                })).not.toThrow();
+            });
+
+            it('should validate 2-level nested array (array of number arrays)', () => {
+                const data = {
+                    grid: [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+                };
+                expect(() => validate(data, {
+                    grid: [[Number]] as any
+                })).not.toThrow();
+            });
+
+            it('should validate 3-level nested array', () => {
+                const data = {
+                    cube: [
+                        [['a', 'b'], ['c', 'd']],
+                        [['e', 'f'], ['g', 'h']]
+                    ]
+                };
+                expect(() => validate(data, {
+                    cube: [[[String]]] as any
+                })).not.toThrow();
+            });
+
+            it('should validate 4-level nested array', () => {
+                const data = {
+                    hypercube: [
+                        [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],
+                        [[[9, 10], [11, 12]], [[13, 14], [15, 16]]]
+                    ]
+                };
+                expect(() => validate(data, {
+                    hypercube: [[[[Number]]]] as any
+                })).not.toThrow();
+            });
+
+            it('should reject 2-level nested array with wrong element type', () => {
+                const data = {
+                    matrix: [['a', 'b'], ['c', 123]]
+                };
+                expect(() => validate(data, {
+                    matrix: [[String]] as any
+                })).toThrow(RuntimeTypeError);
+            });
+
+            it('should reject 3-level nested array with wrong element type', () => {
+                const data = {
+                    cube: [
+                        [[1, 2], [3, 4]],
+                        [[5, 'wrong'], [7, 8]]
+                    ]
+                };
+                expect(() => validate(data, {
+                    cube: [[[Number]]] as any
+                })).toThrow(RuntimeTypeError);
+            });
+
+            it('should validate empty nested arrays', () => {
+                const data = {
+                    matrix: [[], [], []]
+                };
+                expect(() => validate(data, {
+                    matrix: [[String]] as any
+                })).not.toThrow();
+            });
+
+            it('should validate mixed depth nested arrays (with empty inner arrays)', () => {
+                const data = {
+                    data: [[1, 2], [], [3]]
+                };
+                expect(() => validate(data, {
+                    data: [[Number]] as any
+                })).not.toThrow();
+            });
+        });
+
+        describe('deeply nested objects (5+ levels)', () => {
+            it('should validate 5-level nested object', () => {
+                const data = {
+                    level1: {
+                        level2: {
+                            level3: {
+                                level4: {
+                                    level5: 'deep value'
+                                }
+                            }
+                        }
+                    }
+                };
+                expect(() => validate(data, {
+                    level1: {
+                        level2: {
+                            level3: {
+                                level4: {
+                                    level5: String
+                                }
+                            }
+                        }
+                    }
+                })).not.toThrow();
+            });
+
+            it('should validate 6-level nested object with multiple fields', () => {
+                const data = {
+                    a: {
+                        b: {
+                            c: {
+                                d: {
+                                    e: {
+                                        f: 123,
+                                        g: 'text'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                };
+                expect(() => validate(data, {
+                    a: {
+                        b: {
+                            c: {
+                                d: {
+                                    e: {
+                                        f: Number,
+                                        g: String
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })).not.toThrow();
+            });
+
+            it('should reject 5-level nested object with wrong type', () => {
+                const data = {
+                    level1: {
+                        level2: {
+                            level3: {
+                                level4: {
+                                    level5: 123
+                                }
+                            }
+                        }
+                    }
+                };
+                expect(() => validate(data, {
+                    level1: {
+                        level2: {
+                            level3: {
+                                level4: {
+                                    level5: String
+                                }
+                            }
+                        }
+                    }
+                })).toThrow(RuntimeTypeError);
+            });
+
+            it('should include correct path for deeply nested error', () => {
+                try {
+                    validate({
+                        a: { b: { c: { d: { e: { f: 'wrong' } } } } }
+                    }, {
+                        a: { b: { c: { d: { e: { f: Number } } } } }
+                    });
+                    fail('Expected to throw');
+                } catch (e) {
+                    expect(e).toBeInstanceOf(RuntimeTypeError);
+                    expect((e as Error).message).toContain('a.b.c.d.e.f');
+                }
+            });
+        });
+
+        describe('complex nested object-array combinations', () => {
+            it('should validate object containing array of objects with nested arrays', () => {
+                const data = {
+                    departments: [
+                        {
+                            name: 'Engineering',
+                            teams: [
+                                { name: 'Frontend', members: ['Alice', 'Bob'] },
+                                { name: 'Backend', members: ['Charlie', 'Dave'] }
+                            ]
+                        },
+                        {
+                            name: 'Design',
+                            teams: [
+                                { name: 'UX', members: ['Eve'] }
+                            ]
+                        }
+                    ]
+                };
+                expect(() => validate(data, {
+                    departments: [{
+                        name: String,
+                        teams: [{
+                            name: String,
+                            members: [String]
+                        }]
+                    }]
+                })).not.toThrow();
+            });
+
+            it('should validate array of arrays of objects', () => {
+                const data = {
+                    grid: [
+                        [{ x: 0, y: 0 }, { x: 1, y: 0 }],
+                        [{ x: 0, y: 1 }, { x: 1, y: 1 }]
+                    ]
+                };
+                expect(() => validate(data, {
+                    grid: [[{ x: Number, y: Number }]] as any
+                })).not.toThrow();
+            });
+
+            it('should validate object with array of arrays of objects containing arrays', () => {
+                const data = {
+                    building: {
+                        floors: [
+                            [
+                                { roomId: 101, occupants: ['John', 'Jane'] },
+                                { roomId: 102, occupants: ['Bob'] }
+                            ],
+                            [
+                                { roomId: 201, occupants: [] }
+                            ]
+                        ]
+                    }
+                };
+                expect(() => validate(data, {
+                    building: {
+                        floors: [[{
+                            roomId: Number,
+                            occupants: [String]
+                        }]] as any
+                    }
+                })).not.toThrow();
+            });
+
+            it('should validate deeply nested structure with mixed arrays and objects', () => {
+                const data = {
+                    company: {
+                        regions: [
+                            {
+                                name: 'North',
+                                offices: [
+                                    {
+                                        city: 'NYC',
+                                        departments: [
+                                            {
+                                                name: 'Sales',
+                                                employees: [
+                                                    { id: 1, name: 'Alice', skills: ['negotiation', 'communication'] }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                };
+                expect(() => validate(data, {
+                    company: {
+                        regions: [{
+                            name: String,
+                            offices: [{
+                                city: String,
+                                departments: [{
+                                    name: String,
+                                    employees: [{
+                                        id: Number,
+                                        name: String,
+                                        skills: [String]
+                                    }]
+                                }]
+                            }]
+                        }]
+                    }
+                })).not.toThrow();
+            });
+
+            it('should reject nested array of objects with wrong inner field type', () => {
+                const data = {
+                    grid: [
+                        [{ x: 0, y: 0 }, { x: 1, y: 'wrong' }]
+                    ]
+                };
+                expect(() => validate(data, {
+                    grid: [[{ x: Number, y: Number }]] as any
+                })).toThrow(RuntimeTypeError);
+            });
+
+            it('should include correct path for nested array of arrays of objects error', () => {
+                try {
+                    validate({
+                        matrix: [
+                            [{ value: 1 }, { value: 2 }],
+                            [{ value: 3 }, { value: 'wrong' }]
+                        ]
+                    }, {
+                        matrix: [[{ value: Number }]] as any
+                    });
+                    fail('Expected to throw');
+                } catch (e) {
+                    expect(e).toBeInstanceOf(RuntimeTypeError);
+                    expect((e as Error).message).toContain('matrix[1][1].value');
+                }
+            });
+        });
+
+        describe('nested structures with Optional and Nullable', () => {
+            it('should validate deeply nested Optional fields', () => {
+                const data = {
+                    level1: {
+                        level2: {
+                            level3: {}
+                        }
+                    }
+                };
+                expect(() => validate(data, {
+                    level1: {
+                        level2: {
+                            level3: {
+                                level4: Optional({
+                                    level5: Optional(String)
+                                })
+                            }
+                        }
+                    }
+                })).not.toThrow();
+            });
+
+            it('should validate deeply nested Nullable fields', () => {
+                const data = {
+                    level1: {
+                        level2: {
+                            level3: {
+                                level4: null
+                            }
+                        }
+                    }
+                };
+                expect(() => validate(data, {
+                    level1: {
+                        level2: {
+                            level3: {
+                                level4: Nullable({
+                                    level5: String
+                                })
+                            }
+                        }
+                    }
+                })).not.toThrow();
+            });
+
+            it('should validate nested arrays with Optional elements in objects', () => {
+                const data = {
+                    matrix: [
+                        [{ value: 1, label: 'a' }, { value: 2 }],
+                        [{ value: 3, label: 'c' }]
+                    ]
+                };
+                expect(() => validate(data, {
+                    matrix: [[{
+                        value: Number,
+                        label: Optional(String)
+                    }]] as any
+                })).not.toThrow();
+            });
+
+            it('should validate nested arrays with Nullable elements in objects', () => {
+                const data = {
+                    matrix: [
+                        [{ value: 1, label: 'a' }, { value: 2, label: null }],
+                        [{ value: 3, label: null }]
+                    ]
+                };
+                expect(() => validate(data, {
+                    matrix: [[{
+                        value: Number,
+                        label: Nullable(String)
+                    }]] as any
+                })).not.toThrow();
+            });
+
+            it('should validate Optional nested array of arrays', () => {
+                const data = {
+                    data: {
+                        nested: {}
+                    }
+                };
+                expect(() => validate(data, {
+                    data: {
+                        nested: {
+                            matrix: Optional([[Number]] as any)
+                        }
+                    }
+                })).not.toThrow();
+            });
+
+            it('should validate Nullable nested array of arrays', () => {
+                const data = {
+                    data: {
+                        nested: {
+                            matrix: null
+                        }
+                    }
+                };
+                expect(() => validate(data, {
+                    data: {
+                        nested: {
+                            matrix: Nullable([[Number]] as any)
+                        }
+                    }
+                })).not.toThrow();
+            });
+        });
+
+        describe('real-world deeply nested scenarios', () => {
+            it('should validate GraphQL-like nested response', () => {
+                const data = {
+                    data: {
+                        organization: {
+                            id: '123',
+                            repositories: {
+                                edges: [
+                                    {
+                                        node: {
+                                            name: 'repo1',
+                                            issues: {
+                                                edges: [
+                                                    {
+                                                        node: {
+                                                            title: 'Issue 1',
+                                                            labels: {
+                                                                edges: [
+                                                                    { node: { name: 'bug' } }
+                                                                ]
+                                                            }
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                };
+                expect(() => validate(data, {
+                    data: {
+                        organization: {
+                            id: String,
+                            repositories: {
+                                edges: [{
+                                    node: {
+                                        name: String,
+                                        issues: {
+                                            edges: [{
+                                                node: {
+                                                    title: String,
+                                                    labels: {
+                                                        edges: [{
+                                                            node: { name: String }
+                                                        }]
+                                                    }
+                                                }
+                                            }]
+                                        }
+                                    }
+                                }]
+                            }
+                        }
+                    }
+                })).not.toThrow();
+            });
+
+            it('should validate file system tree structure', () => {
+                const data = {
+                    root: {
+                        name: '/',
+                        children: [
+                            {
+                                name: 'home',
+                                children: [
+                                    {
+                                        name: 'user',
+                                        children: [
+                                            { name: 'documents', children: [] },
+                                            { name: 'downloads', children: [] }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                name: 'etc',
+                                children: []
+                            }
+                        ]
+                    }
+                };
+                const nodeSchema: any = {
+                    name: String,
+                    children: [{ name: String, children: [{ name: String, children: Array }] }]
+                };
+                expect(() => validate(data, { root: nodeSchema })).not.toThrow();
+            });
+
+            it('should validate multi-dimensional game board state', () => {
+                const data = {
+                    game: {
+                        boards: [
+                            {
+                                id: 1,
+                                grid: [
+                                    [{ piece: 'X', position: { row: 0, col: 0 } }, { piece: 'O', position: { row: 0, col: 1 } }],
+                                    [{ piece: null, position: { row: 1, col: 0 } }, { piece: 'X', position: { row: 1, col: 1 } }]
+                                ]
+                            }
+                        ]
+                    }
+                };
+                expect(() => validate(data, {
+                    game: {
+                        boards: [{
+                            id: Number,
+                            grid: [[{
+                                piece: Nullable(String),
+                                position: {
+                                    row: Number,
+                                    col: Number
+                                }
+                            }]] as any
+                        }]
+                    }
+                })).not.toThrow();
+            });
+
+            it('should validate nested survey response structure', () => {
+                const data = {
+                    survey: {
+                        sections: [
+                            {
+                                title: 'Section 1',
+                                questions: [
+                                    {
+                                        id: 1,
+                                        text: 'How satisfied are you?',
+                                        options: [
+                                            { value: 1, label: 'Very unsatisfied' },
+                                            { value: 5, label: 'Very satisfied' }
+                                        ],
+                                        responses: [
+                                            { userId: 101, selectedValues: [4, 5] },
+                                            { userId: 102, selectedValues: [3] }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                };
+                expect(() => validate(data, {
+                    survey: {
+                        sections: [{
+                            title: String,
+                            questions: [{
+                                id: Number,
+                                text: String,
+                                options: [{
+                                    value: Number,
+                                    label: String
+                                }],
+                                responses: [{
+                                    userId: Number,
+                                    selectedValues: [Number]
+                                }]
+                            }]
+                        }]
+                    }
+                })).not.toThrow();
+            });
+        });
+    });
+
     describe('type coercion prevention', () => {
         it('should not coerce string "123" to number', () => {
             expect(() => validate({ num: '123' }, { num: Number })).toThrow(RuntimeTypeError);
