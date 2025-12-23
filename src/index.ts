@@ -121,14 +121,14 @@ function getTypeName(value: any): string {
     return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
-const TYPE_VALIDATORS: Record<string, (value: any) => boolean> = {
-    Number: (value) => typeof value === 'number' && !Number.isNaN(value),
-    String: (value) => typeof value === 'string',
-    Boolean: (value) => typeof value === 'boolean',
-    Array: (value) => Array.isArray(value),
-    Object: (value) => typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date),
-    Date: (value) => value instanceof Date && !Number.isNaN(value.getTime())
-};
+const TYPE_VALIDATORS = new Map<Function, (value: any) => boolean>([
+    [Number, (value) => typeof value === 'number' && !Number.isNaN(value)],
+    [String, (value) => typeof value === 'string'],
+    [Boolean, (value) => typeof value === 'boolean'],
+    [Array, (value) => Array.isArray(value)],
+    [Object, (value) => typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)],
+    [Date, (value) => value instanceof Date && !Number.isNaN(value.getTime())]
+]);
 
 function isValidateExpression(ctor: any): ctor is Expression {
     return typeof ctor === 'object' && !Array.isArray(ctor);
@@ -151,35 +151,38 @@ function isBothOptionalAndNullable(ctor: any): boolean {
 }
 
 function unwrapOptionalNullable(ctor: any): any {
-    if (!ctor || typeof ctor !== 'object') {
-        return ctor;
+    while (ctor && typeof ctor === 'object' && !Array.isArray(ctor) && ctor.__type) {
+        ctor = ctor.__type;
     }
-    
-    if (Array.isArray(ctor)) {
-        return ctor;
-    }
-    
-    if (ctor.__type) {
-        return ctor.__type;
-    }
-    
-    const unwrapped: any = {};
-    for (const key in ctor) {
-        if (key !== '__optional' && key !== '__nullable' && key !== '__type') {
-            unwrapped[key] = ctor[key];
-        }
-    }
-    
-    if (Object.keys(unwrapped).length === 0 && (ctor.__optional || ctor.__nullable)) {
-        return ctor;
-    }
-    
-    return unwrapped;
+    return ctor;
 }
 
 function assertType(key: string, expectedType: string, value: any, isValid: boolean): void {
     if (!isValid) {
         throw new RuntimeTypeError(key, expectedType, getTypeName(value), value);
+    }
+}
+
+function validateArrayElement(item: any, schema: any, path: string): void {
+    if (isArraySchema(schema)) {
+        assertType(path, "Array", item, Array.isArray(item));
+        const innerSchema = schema[0];
+        const arr = item as any[];
+        for (let i = 0; i < arr.length; i++) {
+            validateArrayElement(arr[i], innerSchema, `${path}[${i}]`);
+        }
+    } else if (isValidateExpression(schema)) {
+        const objectValidator = TYPE_VALIDATORS.get(Object);
+        assertType(path, "Object", item, objectValidator?.(item) ?? false);
+        validate(item, schema, path);
+    } else if (typeof schema === 'function') {
+        const validator = TYPE_VALIDATORS.get(schema);
+        if (!validator) {
+            throw new Error("Invalid array element expression.");
+        }
+        assertType(path, schema.name, item, validator(item));
+    } else {
+        throw new Error("Invalid array element expression.");
     }
 }
 
@@ -228,7 +231,10 @@ export function validate<T extends Expression>(
     expression: T,
     path: string = ""
 ): asserts target is InferType<T> {
-    for (const [key, ctor] of Object.entries(expression)) {
+    for (const key in expression) {
+        if (!Object.prototype.hasOwnProperty.call(expression, key)) continue;
+
+        const ctor = expression[key];
         const value = target[key];
         const currentPath = path ? `${path}.${key}` : key;
 
@@ -249,35 +255,22 @@ export function validate<T extends Expression>(
         if (isArraySchema(unwrappedCtor)) {
             assertType(currentPath, "Array", value, Array.isArray(value));
             const elementSchema = unwrappedCtor[0];
+            const arr = value as any[];
 
-            (value as any[]).forEach((item, index) => {
-                const arrayPath = `${currentPath}[${index}]`;
-                if (isValidateExpression(elementSchema)) {
-                    const objectValidator = TYPE_VALIDATORS['Object'];
-                    assertType(arrayPath, "Object", item, objectValidator?.(item) ?? false);
-                    validate(item, elementSchema, arrayPath);
-                } else {
-                    const validator = TYPE_VALIDATORS[elementSchema.name];
-                    if (!validator) {
-                        throw new Error("Invalid array element expression.");
-                    }
-                    assertType(arrayPath, elementSchema.name, item, validator(item));
-                }
-            });
+            for (let i = 0; i < arr.length; i++) {
+                validateArrayElement(arr[i], elementSchema, `${currentPath}[${i}]`);
+            }
             continue;
         }
 
         if (typeof unwrappedCtor === 'function') {
-            const validator = TYPE_VALIDATORS[unwrappedCtor.name];
+            const validator = TYPE_VALIDATORS.get(unwrappedCtor);
             if (!validator) {
                 throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
             }
             assertType(currentPath, unwrappedCtor.name, value, validator(value));
         } else if (isValidateExpression(unwrappedCtor)) {
-            const objectValidator = TYPE_VALIDATORS['Object'];
-            if (!objectValidator) {
-                throw new Error("Object validator not found");
-            }
+            const objectValidator = TYPE_VALIDATORS.get(Object)!;
             assertType(currentPath, "Object", value, objectValidator(value));
             validate(value, unwrappedCtor, currentPath);
         } else {
