@@ -121,6 +121,11 @@ function getTypeName(value: any): string {
     return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
+type FieldCheck = (target: any, path: string) => void;
+type CompiledValidator = (target: any, path: string) => void;
+
+const schemaCache = new WeakMap<object, CompiledValidator>();
+
 const TYPE_VALIDATORS = new Map<Function, (value: any) => boolean>([
     [Number, (value) => typeof value === 'number' && !Number.isNaN(value)],
     [String, (value) => typeof value === 'string'],
@@ -163,27 +168,141 @@ function assertType(key: string, expectedType: string, value: any, isValid: bool
     }
 }
 
-function validateArrayElement(item: any, schema: any, path: string): void {
-    if (isArraySchema(schema)) {
-        assertType(path, "Array", item, Array.isArray(item));
-        const innerSchema = schema[0];
-        const arr = item as any[];
+function createPrimitiveCheck(
+    key: string,
+    isOpt: boolean,
+    isNull: boolean,
+    isBoth: boolean,
+    validator: (v: any) => boolean,
+    typeName: string
+): FieldCheck {
+    return (target, path) => {
+        const value = target[key];
+        const currentPath = path ? `${path}.${key}` : key;
+
+        if (isBoth && (value === undefined || value === null)) return;
+        if (isOpt && value === undefined) return;
+        if (isNull && value === null) return;
+
+        assertType(currentPath, "not undefined or null", value, value !== undefined && value !== null);
+        assertType(currentPath, typeName, value, validator(value));
+    };
+}
+
+function createArrayCheck(
+    key: string,
+    isOpt: boolean,
+    isNull: boolean,
+    isBoth: boolean,
+    elementChecker: (item: any, path: string) => void
+): FieldCheck {
+    return (target, path) => {
+        const value = target[key];
+        const currentPath = path ? `${path}.${key}` : key;
+
+        if (isBoth && (value === undefined || value === null)) return;
+        if (isOpt && value === undefined) return;
+        if (isNull && value === null) return;
+
+        assertType(currentPath, "not undefined or null", value, value !== undefined && value !== null);
+        assertType(currentPath, "Array", value, Array.isArray(value));
+
+        const arr = value as any[];
         for (let i = 0; i < arr.length; i++) {
-            validateArrayElement(arr[i], innerSchema, `${path}[${i}]`);
+            elementChecker(arr[i], `${currentPath}[${i}]`);
         }
+    };
+}
+
+function createObjectCheck(
+    key: string,
+    isOpt: boolean,
+    isNull: boolean,
+    isBoth: boolean,
+    nestedValidator: CompiledValidator
+): FieldCheck {
+    const objectValidator = TYPE_VALIDATORS.get(Object)!;
+
+    return (target, path) => {
+        const value = target[key];
+        const currentPath = path ? `${path}.${key}` : key;
+
+        if (isBoth && (value === undefined || value === null)) return;
+        if (isOpt && value === undefined) return;
+        if (isNull && value === null) return;
+
+        assertType(currentPath, "not undefined or null", value, value !== undefined && value !== null);
+        assertType(currentPath, "Object", value, objectValidator(value));
+        nestedValidator(value, currentPath);
+    };
+}
+
+function compileArrayElement(schema: any): (item: any, path: string) => void {
+    if (isArraySchema(schema)) {
+        const innerChecker = compileArrayElement(schema[0]);
+        return (item, path) => {
+            assertType(path, "Array", item, Array.isArray(item));
+            const arr = item as any[];
+            for (let i = 0; i < arr.length; i++) {
+                innerChecker(arr[i], `${path}[${i}]`);
+            }
+        };
     } else if (isValidateExpression(schema)) {
-        const objectValidator = TYPE_VALIDATORS.get(Object);
-        assertType(path, "Object", item, objectValidator?.(item) ?? false);
-        validate(item, schema, path);
+        const compiled = compileSchema(schema);
+        const objectValidator = TYPE_VALIDATORS.get(Object)!;
+        return (item, path) => {
+            assertType(path, "Object", item, objectValidator(item));
+            compiled(item, path);
+        };
     } else if (typeof schema === 'function') {
         const validator = TYPE_VALIDATORS.get(schema);
         if (!validator) {
             throw new Error("Invalid array element expression.");
         }
-        assertType(path, schema.name, item, validator(item));
-    } else {
-        throw new Error("Invalid array element expression.");
+        const typeName = schema.name;
+        return (item, path) => {
+            assertType(path, typeName, item, validator(item));
+        };
     }
+    throw new Error("Invalid array element expression.");
+}
+
+function compileSchema(expression: Expression): CompiledValidator {
+    const checks: FieldCheck[] = [];
+
+    for (const key in expression) {
+        if (!Object.prototype.hasOwnProperty.call(expression, key)) continue;
+
+        const ctor = expression[key];
+        const isOpt = isOptional(ctor);
+        const isNull = isNullable(ctor);
+        const isBoth = isBothOptionalAndNullable(ctor);
+        const unwrapped = unwrapOptionalNullable(ctor);
+
+        if (isArraySchema(unwrapped)) {
+            const elementSchema = unwrapped[0];
+            const elementChecker = compileArrayElement(elementSchema);
+            checks.push(createArrayCheck(key, isOpt, isNull, isBoth, elementChecker));
+        } else if (typeof unwrapped === 'function') {
+            const validator = TYPE_VALIDATORS.get(unwrapped);
+            if (!validator) {
+                throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
+            }
+            const typeName = unwrapped.name;
+            checks.push(createPrimitiveCheck(key, isOpt, isNull, isBoth, validator, typeName));
+        } else if (isValidateExpression(unwrapped)) {
+            const nestedValidator = compileSchema(unwrapped);
+            checks.push(createObjectCheck(key, isOpt, isNull, isBoth, nestedValidator));
+        } else {
+            throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
+        }
+    }
+
+    return (target: any, path: string) => {
+        for (const check of checks) {
+            check(target, path);
+        }
+    };
 }
 
 /**
@@ -231,50 +350,10 @@ export function validate<T extends Expression>(
     expression: T,
     path: string = ""
 ): asserts target is InferType<T> {
-    for (const key in expression) {
-        if (!Object.prototype.hasOwnProperty.call(expression, key)) continue;
-
-        const ctor = expression[key];
-        const value = target[key];
-        const currentPath = path ? `${path}.${key}` : key;
-
-        if (isBothOptionalAndNullable(ctor)) {
-            if (value === undefined || value === null) {
-                continue
-            }
-        } else if (value === undefined && isOptional(ctor)) {
-            continue;
-        } else if (value === null && isNullable(ctor)) {
-            continue;
-        } else {
-            assertType(currentPath, "not undefined or null", value, value !== undefined && value !== null);
-        }
-
-        const unwrappedCtor = unwrapOptionalNullable(ctor);
-
-        if (isArraySchema(unwrappedCtor)) {
-            assertType(currentPath, "Array", value, Array.isArray(value));
-            const elementSchema = unwrappedCtor[0];
-            const arr = value as any[];
-
-            for (let i = 0; i < arr.length; i++) {
-                validateArrayElement(arr[i], elementSchema, `${currentPath}[${i}]`);
-            }
-            continue;
-        }
-
-        if (typeof unwrappedCtor === 'function') {
-            const validator = TYPE_VALIDATORS.get(unwrappedCtor);
-            if (!validator) {
-                throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
-            }
-            assertType(currentPath, unwrappedCtor.name, value, validator(value));
-        } else if (isValidateExpression(unwrappedCtor)) {
-            const objectValidator = TYPE_VALIDATORS.get(Object)!;
-            assertType(currentPath, "Object", value, objectValidator(value));
-            validate(value, unwrappedCtor, currentPath);
-        } else {
-            throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
-        }
+    let compiled = schemaCache.get(expression);
+    if (!compiled) {
+        compiled = compileSchema(expression);
+        schemaCache.set(expression, compiled);
     }
+    compiled(target, path);
 }
