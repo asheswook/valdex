@@ -13,6 +13,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
 //    "skipLibCheck": true,
     "strictNullChecks": true,
     "noImplicitAny": true,
