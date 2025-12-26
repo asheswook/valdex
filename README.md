@@ -1,6 +1,30 @@
 # valdex
 
-Runtime type validation with TypeScript type inference.
+**Runtime type validation with TypeScript type inference**
+
+Validate unknown data at runtime and get automatic TypeScript type narrowing—without separate schema objects or class instances.
+
+## Why valdex?
+
+Runtime validation libraries typically require you to define schemas separately and instantiate them before use. This creates distance between where you validate and where you consume the data.
+
+Valdex takes a different approach: validate inline, exactly where you need it. No jumping between schema definitions and usage points. No maintaining separate DTO classes or validator instances.
+
+```typescript
+// Traditional approach - schema defined elsewhere
+const userSchema = z.object({ name: z.string(), age: z.number() });
+const user = userSchema.parse(data);
+
+// valdex - validate at point of use
+validate(data, { name: String, age: Number });
+// data is now typed as { name: string, age: number }
+```
+
+This is particularly useful when working with:
+- Database query results (mysql2, pg, etc.)
+- External API responses (axios, fetch)
+- Message queue payloads
+- Any `unknown` or `any` typed data that needs runtime verification
 
 ## Installation
 
@@ -10,11 +34,11 @@ npm install valdex
 
 ## Features
 
-- Runtime type validation for unknown data
-- Automatic TypeScript type inference from schema
-- Support for nested objects and arrays
-- Optional and nullable field modifiers
-- Zero dependencies
+- **Zero dependencies**: No external dependencies
+- **Type inference**: Automatic TypeScript type narrowing after validation
+- **Inline validation**: Validate where you use, not where you define
+- **Nested structures**: Full support for nested objects and arrays
+- **Optional/Nullable**: Flexible handling of optional and nullable fields
 
 ## Usage
 
@@ -26,9 +50,9 @@ import { validate } from 'valdex';
 const data: unknown = await fetchData();
 
 validate(data, {
-    name: String,
-    age: Number,
-    active: Boolean
+  name: String,
+  age: Number,
+  active: Boolean
 });
 
 // TypeScript now knows the exact type of data
@@ -41,13 +65,13 @@ data.active // boolean
 
 ```typescript
 validate(data, {
-    user: {
-        id: Number,
-        profile: {
-            name: String,
-            email: String
-        }
+  user: {
+    id: Number,
+    profile: {
+      name: String,
+      email: String
     }
+  }
 });
 
 data.user.profile.name // string
@@ -57,11 +81,11 @@ data.user.profile.name // string
 
 ```typescript
 validate(data, {
-    tags: [String],           // string[]
-    items: [{                 // { id: number, name: string }[]
-        id: Number,
-        name: String
-    }]
+  tags: [String],           // string[]
+  items: [{                 // { id: number, name: string }[]
+    id: Number,
+    name: String
+  }]
 });
 
 data.tags[0]       // string
@@ -76,12 +100,12 @@ Use `Optional()` to allow `undefined` values:
 import { validate, Optional } from 'valdex';
 
 validate(data, {
-    required: String,
-    optional: Optional(String),      // string | undefined
-    optionalObject: Optional({       // { id: number } | undefined
-        id: Number
-    }),
-    optionalArray: Optional([Number]) // number[] | undefined
+  required: String,
+  optional: Optional(String),      // string | undefined
+  optionalObject: Optional({       // { id: number } | undefined
+    id: Number
+  }),
+  optionalArray: Optional([Number]) // number[] | undefined
 });
 ```
 
@@ -93,11 +117,11 @@ Use `Nullable()` to allow `null` values:
 import { validate, Nullable } from 'valdex';
 
 validate(data, {
-    required: String,
-    nullable: Nullable(String),      // string | null
-    nullableObject: Nullable({       // { id: number } | null
-        id: Number
-    })
+  required: String,
+  nullable: Nullable(String),      // string | null
+  nullableObject: Nullable({       // { id: number } | null
+    id: Number
+  })
 });
 ```
 
@@ -107,7 +131,7 @@ validate(data, {
 import { validate, Optional, Nullable } from 'valdex';
 
 validate(data, {
-    field: Optional(Nullable(String)) // string | undefined | null
+  field: Optional(Nullable(String)) // string | undefined | null
 });
 ```
 
@@ -130,12 +154,12 @@ When validation fails, a `RuntimeTypeError` is thrown:
 import { validate, RuntimeTypeError } from 'valdex';
 
 try {
-    validate(data, { count: Number });
+  validate(data, { count: Number });
 } catch (error) {
-    if (error instanceof RuntimeTypeError) {
-        console.error(error.message);
-        // "count must be Number, but got String. Actual value: hello"
-    }
+  if (error instanceof RuntimeTypeError) {
+    console.error(error.message);
+    // "count must be Number, but got String. Actual value: hello"
+  }
 }
 ```
 
