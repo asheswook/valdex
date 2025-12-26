@@ -81,8 +81,8 @@ data.user.profile.name // string
 
 ```typescript
 validate(data, {
-  tags: [String],           // string[]
-  items: [{                 // { id: number, name: string }[]
+  tags: [String],  // string[]
+  items: [{        // { id: number, name: string }[]
     id: Number,
     name: String
   }]
@@ -101,8 +101,8 @@ import { validate, Optional } from 'valdex';
 
 validate(data, {
   required: String,
-  optional: Optional(String),      // string | undefined
-  optionalObject: Optional({       // { id: number } | undefined
+  optional: Optional(String),  // string | undefined
+  optionalObject: Optional({   // { id: number } | undefined
     id: Number
   }),
   optionalArray: Optional([Number]) // number[] | undefined
@@ -118,8 +118,8 @@ import { validate, Nullable } from 'valdex';
 
 validate(data, {
   required: String,
-  nullable: Nullable(String),      // string | null
-  nullableObject: Nullable({       // { id: number } | null
+  nullable: Nullable(String),  // string | null
+  nullableObject: Nullable({   // { id: number } | null
     id: Number
   })
 });
