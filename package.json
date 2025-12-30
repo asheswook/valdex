@@ -23,7 +23,13 @@
   "scripts": {
     "build": "tsup",
     "prepublishOnly": "npm run build",
-    "test": "jest"
+    "test": "jest",
+    "test:types": "tsd",
+    "test:all": "npm test && npm run test:types"
+  },
+  "tsd": {
+    "directory": "src",
+    "typingsFile": "src/index.ts"
   },
   "keywords": [
     "typescript",
@@ -39,6 +45,7 @@
     "@types/jest": "^30.0.0",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
+    "tsd": "^0.33.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
