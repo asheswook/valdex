@@ -19,7 +19,7 @@ type InferPrimitiveType<T> =
                         T extends DateConstructor ? Date :
                             never;
 
-type InferType<T> =
+export type InferType<T> =
     T extends PrimitiveType & OptionalMarker & NullableMarker
         ? InferPrimitiveType<T> | undefined | null
         : T extends PrimitiveType & OptionalMarker
@@ -29,24 +29,22 @@ type InferType<T> =
                 : T extends PrimitiveType
                     ? InferPrimitiveType<T>
                     : T extends ArraySchema & OptionalMarker & NullableMarker
-                        ? (T extends [infer U] ? (U extends Expression ? InferType<U>[] : U extends PrimitiveType ? InferPrimitiveType<U>[] : never) : never) | undefined | null
+                        ? (T extends [infer U] ? (U extends PrimitiveType ? InferPrimitiveType<U>[] : InferType<U>[]) : never) | undefined | null
                         : T extends ArraySchema & OptionalMarker
-                            ? (T extends [infer U] ? (U extends Expression ? InferType<U>[] : U extends PrimitiveType ? InferPrimitiveType<U>[] : never) : never) | undefined
+                            ? (T extends [infer U] ? (U extends PrimitiveType ? InferPrimitiveType<U>[] : InferType<U>[]) : never) | undefined
                             : T extends ArraySchema & NullableMarker
-                                ? (T extends [infer U] ? (U extends Expression ? InferType<U>[] : U extends PrimitiveType ? InferPrimitiveType<U>[] : never) : never) | null
+                                ? (T extends [infer U] ? (U extends PrimitiveType ? InferPrimitiveType<U>[] : InferType<U>[]) : never) | null
                                 : T extends [infer U]
-                                    ? U extends Expression
-                                        ? InferType<U>[]
-                                        : U extends PrimitiveType
-                                            ? InferPrimitiveType<U>[]
-                                            : never
+                                    ? U extends PrimitiveType
+                                        ? InferPrimitiveType<U>[]
+                                        : InferType<U>[]
                                     : T extends OptionalMarker & NullableMarker
                                         ? { [K in keyof T as K extends MarkerKeys ? never : K]: InferType<T[K]> } | undefined | null
                                         : T extends OptionalMarker
                                             ? { [K in keyof T as K extends MarkerKeys ? never : K]: InferType<T[K]> } | undefined
                                             : T extends NullableMarker
                                                 ? { [K in keyof T as K extends MarkerKeys ? never : K]: InferType<T[K]> } | null
-                                                : T extends Expression
+                                                : T extends Record<string, any>
                                                     ? { [K in keyof T]: InferType<T[K]> }
                                                     : never;
 
