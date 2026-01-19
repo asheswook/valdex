@@ -83,6 +83,17 @@ export type InferType<T> =
                                                 ? InferNullable<T>
                                                 : InferObject<T>;
 
+function createMarker<T extends PrimitiveType | Expression | ArraySchema, M>(
+    ctor: T,
+    marker: M
+): T & M {
+    return {
+        ...ctor as any,
+        ...marker,
+        __type: ctor
+    } as T & M;
+}
+
 /**
  * Marks a field as optional.
  * Optional fields pass validation even if they are undefined.
@@ -100,11 +111,7 @@ export type InferType<T> =
  * ```
  */
 export function Optional<T extends PrimitiveType | Expression | ArraySchema>(ctor: T): T & OptionalMarker {
-    return {
-        ...ctor as any,
-        __optional: true,
-        __type: ctor
-    } as T & OptionalMarker;
+    return createMarker(ctor, { __optional: true as const });
 }
 
 /**
@@ -124,11 +131,7 @@ export function Optional<T extends PrimitiveType | Expression | ArraySchema>(cto
  * ```
  */
 export function Nullable<T extends PrimitiveType | Expression | ArraySchema>(ctor: T): T & NullableMarker {
-    return {
-        ...ctor as any,
-        __nullable: true,
-        __type: ctor
-    } as T & NullableMarker;
+    return createMarker(ctor, { __nullable: true as const });
 }
 
 export class RuntimeTypeError extends Error {
@@ -197,6 +200,23 @@ function assertType(key: string, expectedType: string, value: any, isValid: bool
     }
 }
 
+function assertObject(path: string, value: any): void {
+    const objectValidator = TYPE_VALIDATORS.get(Object);
+    assertType(path, "Object", value, objectValidator?.(value) ?? false);
+}
+
+function validateLiteral(value: any, schema: any, path: string, errorMessage: string = "Invalid array element expression."): void {
+    if (typeof schema === 'function') {
+        const validator = TYPE_VALIDATORS.get(schema);
+        if (!validator) {
+            throw new Error(errorMessage);
+        }
+        assertType(path, schema.name, value, validator(value));
+    } else {
+        throw new Error(errorMessage);
+    }
+}
+
 function validateArrayElement(item: any, schema: any, path: string): void {
     if (isArraySchema(schema)) {
         assertType(path, "Array", item, Array.isArray(item));
@@ -206,17 +226,10 @@ function validateArrayElement(item: any, schema: any, path: string): void {
             validateArrayElement(arr[i], innerSchema, `${path}[${i}]`);
         }
     } else if (isValidateExpression(schema)) {
-        const objectValidator = TYPE_VALIDATORS.get(Object);
-        assertType(path, "Object", item, objectValidator?.(item) ?? false);
+        assertObject(path, item);
         validate(item, schema, path);
-    } else if (typeof schema === 'function') {
-        const validator = TYPE_VALIDATORS.get(schema);
-        if (!validator) {
-            throw new Error("Invalid array element expression.");
-        }
-        assertType(path, schema.name, item, validator(item));
     } else {
-        throw new Error("Invalid array element expression.");
+        validateLiteral(item, schema, path);
     }
 }
 
@@ -298,14 +311,9 @@ export function validate<T extends Expression>(
         }
 
         if (typeof unwrappedCtor === 'function') {
-            const validator = TYPE_VALIDATORS.get(unwrappedCtor);
-            if (!validator) {
-                throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
-            }
-            assertType(currentPath, unwrappedCtor.name, value, validator(value));
+            validateLiteral(value, unwrappedCtor, currentPath, "Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
         } else if (isValidateExpression(unwrappedCtor)) {
-            const objectValidator = TYPE_VALIDATORS.get(Object)!;
-            assertType(currentPath, "Object", value, objectValidator(value));
+            assertObject(currentPath, value);
             validate(value, unwrappedCtor, currentPath);
         } else {
             throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
