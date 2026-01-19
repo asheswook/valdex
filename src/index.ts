@@ -233,6 +233,44 @@ function validateArrayElement(item: any, schema: any, path: string): void {
     }
 }
 
+function validateField(key: string, ctor: any, value: any, path: string): void {
+    const currentPath = path ? `${path}.${key}` : key;
+
+    if (isBothOptionalAndNullable(ctor)) {
+        if (value === undefined || value === null) {
+            return;
+        }
+    } else if (value === undefined && isOptional(ctor)) {
+        return;
+    } else if (value === null && isNullable(ctor)) {
+        return;
+    } else {
+        assertType(currentPath, "not undefined or null", value, value !== undefined && value !== null);
+    }
+
+    const unwrappedCtor = unwrapOptionalNullable(ctor);
+
+    if (isArraySchema(unwrappedCtor)) {
+        assertType(currentPath, "Array", value, Array.isArray(value));
+        const elementSchema = unwrappedCtor[0];
+        const arr = value as any[];
+
+        for (let i = 0; i < arr.length; i++) {
+            validateArrayElement(arr[i], elementSchema, `${currentPath}[${i}]`);
+        }
+        return;
+    }
+
+    if (typeof unwrappedCtor === 'function') {
+        validateLiteral(value, unwrappedCtor, currentPath, "Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
+    } else if (isValidateExpression(unwrappedCtor)) {
+        assertObject(currentPath, value);
+        validate(value, unwrappedCtor, currentPath);
+    } else {
+        throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
+    }
+}
+
 /**
  * Asserts the type of target according to the expression schema.
  * The expression should be represented using primitive type constructors.
@@ -283,40 +321,7 @@ export function validate<T extends Expression>(
 
         const ctor = expression[key];
         const value = target[key];
-        const currentPath = path ? `${path}.${key}` : key;
 
-        if (isBothOptionalAndNullable(ctor)) {
-            if (value === undefined || value === null) {
-                continue
-            }
-        } else if (value === undefined && isOptional(ctor)) {
-            continue;
-        } else if (value === null && isNullable(ctor)) {
-            continue;
-        } else {
-            assertType(currentPath, "not undefined or null", value, value !== undefined && value !== null);
-        }
-
-        const unwrappedCtor = unwrapOptionalNullable(ctor);
-
-        if (isArraySchema(unwrappedCtor)) {
-            assertType(currentPath, "Array", value, Array.isArray(value));
-            const elementSchema = unwrappedCtor[0];
-            const arr = value as any[];
-
-            for (let i = 0; i < arr.length; i++) {
-                validateArrayElement(arr[i], elementSchema, `${currentPath}[${i}]`);
-            }
-            continue;
-        }
-
-        if (typeof unwrappedCtor === 'function') {
-            validateLiteral(value, unwrappedCtor, currentPath, "Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
-        } else if (isValidateExpression(unwrappedCtor)) {
-            assertObject(currentPath, value);
-            validate(value, unwrappedCtor, currentPath);
-        } else {
-            throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
-        }
+        validateField(key, ctor, value, path);
     }
 }
