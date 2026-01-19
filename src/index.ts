@@ -19,34 +19,69 @@ type InferPrimitiveType<T> =
                         T extends DateConstructor ? Date :
                             never;
 
+type InferArray<T> =
+    T extends [infer U]
+        ? U extends PrimitiveType
+            ? InferPrimitiveType<U>[]
+            : InferType<U>[]
+        : never;
+
+type InferOptional<T> =
+    T extends PrimitiveType
+        ? InferPrimitiveType<T> | undefined
+        : T extends ArraySchema
+            ? InferArray<T> | undefined
+            : T extends Record<string, any>
+                ? { [K in keyof T as K extends MarkerKeys ? never : K]: InferType<T[K]> } | undefined
+                : never;
+
+type InferNullable<T> =
+    T extends PrimitiveType
+        ? InferPrimitiveType<T> | null
+        : T extends ArraySchema
+            ? InferArray<T> | null
+            : T extends Record<string, any>
+                ? { [K in keyof T as K extends MarkerKeys ? never : K]: InferType<T[K]> } | null
+                : never;
+
+type InferOptionalNullable<T> =
+    T extends PrimitiveType
+        ? InferPrimitiveType<T> | undefined | null
+        : T extends ArraySchema
+            ? InferArray<T> | undefined | null
+            : T extends Record<string, any>
+                ? { [K in keyof T as K extends MarkerKeys ? never : K]: InferType<T[K]> } | undefined | null
+                : never;
+
+type InferObject<T> =
+    T extends Record<string, any>
+        ? { [K in keyof T]: InferType<T[K]> }
+        : never;
+
 export type InferType<T> =
     T extends PrimitiveType & OptionalMarker & NullableMarker
-        ? InferPrimitiveType<T> | undefined | null
+        ? InferOptionalNullable<T>
         : T extends PrimitiveType & OptionalMarker
-            ? InferPrimitiveType<T> | undefined
+            ? InferOptional<T>
             : T extends PrimitiveType & NullableMarker
-                ? InferPrimitiveType<T> | null
+                ? InferNullable<T>
                 : T extends PrimitiveType
                     ? InferPrimitiveType<T>
                     : T extends ArraySchema & OptionalMarker & NullableMarker
-                        ? (T extends [infer U] ? (U extends PrimitiveType ? InferPrimitiveType<U>[] : InferType<U>[]) : never) | undefined | null
+                        ? InferOptionalNullable<T>
                         : T extends ArraySchema & OptionalMarker
-                            ? (T extends [infer U] ? (U extends PrimitiveType ? InferPrimitiveType<U>[] : InferType<U>[]) : never) | undefined
+                            ? InferOptional<T>
                             : T extends ArraySchema & NullableMarker
-                                ? (T extends [infer U] ? (U extends PrimitiveType ? InferPrimitiveType<U>[] : InferType<U>[]) : never) | null
-                                : T extends [infer U]
-                                    ? U extends PrimitiveType
-                                        ? InferPrimitiveType<U>[]
-                                        : InferType<U>[]
+                                ? InferNullable<T>
+                                : T extends ArraySchema
+                                    ? InferArray<T>
                                     : T extends OptionalMarker & NullableMarker
-                                        ? { [K in keyof T as K extends MarkerKeys ? never : K]: InferType<T[K]> } | undefined | null
+                                        ? InferOptionalNullable<T>
                                         : T extends OptionalMarker
-                                            ? { [K in keyof T as K extends MarkerKeys ? never : K]: InferType<T[K]> } | undefined
+                                            ? InferOptional<T>
                                             : T extends NullableMarker
-                                                ? { [K in keyof T as K extends MarkerKeys ? never : K]: InferType<T[K]> } | null
-                                                : T extends Record<string, any>
-                                                    ? { [K in keyof T]: InferType<T[K]> }
-                                                    : never;
+                                                ? InferNullable<T>
+                                                : InferObject<T>;
 
 /**
  * Marks a field as optional.
