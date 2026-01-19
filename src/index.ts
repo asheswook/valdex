@@ -217,20 +217,24 @@ function validateLiteral(value: any, schema: any, path: string, errorMessage: st
     }
 }
 
-function validateArrayElement(item: any, schema: any, path: string): void {
+function validateValue(value: any, schema: any, path: string, errorMessage: string = "Invalid array element expression."): void {
     if (isArraySchema(schema)) {
-        assertType(path, "Array", item, Array.isArray(item));
+        assertType(path, "Array", value, Array.isArray(value));
         const innerSchema = schema[0];
-        const arr = item as any[];
+        const arr = value as any[];
         for (let i = 0; i < arr.length; i++) {
-            validateArrayElement(arr[i], innerSchema, `${path}[${i}]`);
+            validateValue(arr[i], innerSchema, `${path}[${i}]`);
         }
     } else if (isValidateExpression(schema)) {
-        assertObject(path, item);
-        validate(item, schema, path);
+        assertObject(path, value);
+        validate(value, schema, path);
     } else {
-        validateLiteral(item, schema, path);
+        validateLiteral(value, schema, path, errorMessage);
     }
+}
+
+function validateArrayElement(item: any, schema: any, path: string): void {
+    validateValue(item, schema, path);
 }
 
 function validateField(key: string, ctor: any, value: any, path: string): void {
@@ -250,25 +254,7 @@ function validateField(key: string, ctor: any, value: any, path: string): void {
 
     const unwrappedCtor = unwrapOptionalNullable(ctor);
 
-    if (isArraySchema(unwrappedCtor)) {
-        assertType(currentPath, "Array", value, Array.isArray(value));
-        const elementSchema = unwrappedCtor[0];
-        const arr = value as any[];
-
-        for (let i = 0; i < arr.length; i++) {
-            validateArrayElement(arr[i], elementSchema, `${currentPath}[${i}]`);
-        }
-        return;
-    }
-
-    if (typeof unwrappedCtor === 'function') {
-        validateLiteral(value, unwrappedCtor, currentPath, "Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
-    } else if (isValidateExpression(unwrappedCtor)) {
-        assertObject(currentPath, value);
-        validate(value, unwrappedCtor, currentPath);
-    } else {
-        throw new Error("Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
-    }
+    validateValue(value, unwrappedCtor, currentPath, "Invalid expression. Use 'Number' or 'String' or 'Boolean' or 'Array' or 'Object'.");
 }
 
 /**
