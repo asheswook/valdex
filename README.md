@@ -26,6 +26,18 @@ This is particularly useful when working with:
 - Message queue payloads
 - Any `unknown` or `any` typed data that needs runtime verification
 
+### Philosophy
+
+Valdex is intentionally small. It validates unknown data at the boundary and narrows its TypeScript type where the data is used. It is not a hidden control-flow engine.
+
+Valdex avoids complex conditional schemas, branching rules, and transformation pipelines. If validation needs many branches, the payload is probably doing too much. For example, in an internal event system, that is often a sign that one event should be split into smaller, clearer events.
+
+For internal payloads and repository responses, complexity should stay in explicit application code—or be removed by designing a simpler contract.
+
+Valdex does not make complex payloads look simple. It encourages payloads to actually be simple.
+
+The goal is clear validation, visible control flow, and lightweight type safety.
+
 ## Installation
 
 ```bash
