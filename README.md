@@ -1,3 +1,5 @@
+
+
 # valdex
 
 **Runtime type validation with TypeScript type inference**
@@ -145,6 +147,17 @@ import { validate, Optional, Nullable } from 'valdex';
 validate(data, {
   field: Optional(Nullable(String)) // string | undefined | null
 });
+```
+
+### Type Extraction
+
+You can extract the TypeScript type from a schema definition using the exported `InferType` utility:
+
+```typescript
+import { InferType } from 'valdex';
+
+const schema = { name: String, age: Number };
+type UserData = InferType<typeof schema>; // { name: string; age: number }
 ```
 
 ## Supported Types
